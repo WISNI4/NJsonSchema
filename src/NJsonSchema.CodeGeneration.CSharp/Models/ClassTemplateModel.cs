@@ -1,4 +1,4 @@
-﻿//-----------------------------------------------------------------------
+//-----------------------------------------------------------------------
 // <copyright file="ClassTemplateModel.cs" company="NJsonSchema">
 //     Copyright (c) Rico Suter. All rights reserved.
 // </copyright>
@@ -6,8 +6,10 @@
 // <author>Rico Suter, mail@rsuter.com</author>
 //-----------------------------------------------------------------------
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using NJsonSchema.CodeGeneration.Models;
 
 namespace NJsonSchema.CodeGeneration.CSharp.Models
@@ -18,6 +20,8 @@ namespace NJsonSchema.CodeGeneration.CSharp.Models
         private readonly CSharpTypeResolver _resolver;
         private readonly JsonSchema _schema;
         private readonly CSharpGeneratorSettings _settings;
+        private readonly Regex doubleDot = new Regex("\\.\\.");
+
 
         /// <summary>Initializes a new instance of the <see cref="ClassTemplateModel"/> class.</summary>
         /// <param name="typeName">Name of the type.</param>
@@ -32,7 +36,7 @@ namespace NJsonSchema.CodeGeneration.CSharp.Models
             _resolver = resolver;
             _schema = schema;
             _settings = settings;
-
+          
             ClassName = typeName;
             Properties = _schema.ActualProperties.Values
                 .Where(p => !p.IsInheritanceDiscriminator)
@@ -48,6 +52,9 @@ namespace NJsonSchema.CodeGeneration.CSharp.Models
             {
                 AllProperties = Properties;
             }
+
+            ValidateModel();
+
         }
 
         /// <summary>Gets or sets the class name.</summary>
@@ -139,5 +146,49 @@ namespace NJsonSchema.CodeGeneration.CSharp.Models
 
         /// <summary>Gets the JSON serializer parameter code.</summary>
         public string JsonSerializerParameterCode => CSharpJsonSerializerGenerator.GenerateJsonSerializerParameterCode(_settings, null);
+
+        private void ValidateModel()
+        {
+            if (IsValidIdentifier(ClassName))
+            {
+                throw new Exception($"'{ClassName}' is invalid identifier of Class");
+            }
+
+            foreach (var property in AllProperties)
+            {
+                if (!IsValidIdentifier(property.FieldName))
+                {
+                    throw new Exception($"'{property.FieldName}' is invalid identifier of Property");
+                }
+            }
+
+            ValidateNamespce(Namespace);
+        }
+
+        private void ValidateNamespce(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                throw new Exception("A namespace must be provided.");
+            }
+            else if (doubleDot.IsMatch(input))
+            {
+                throw new Exception("'..' is not valid.");
+            }
+            var inputs = input.Split('.');
+            foreach (var item in inputs)
+            {
+                if (!IsValidIdentifier(item))
+                {
+                    throw new Exception($"'{item}' is invalid part of namespace.");
+                }
+            }
+        }
+
+        private bool IsValidIdentifier(string identifier)
+        {
+            return Microsoft.CodeAnalysis.CSharp.SyntaxFacts.IsValidIdentifier(identifier);
+        }
+
     }
 }
